@@ -22,6 +22,9 @@ const SAMPLES: { name: string; label: string; patch?: boolean }[] = [
   // ftyp 브랜드만 'qt  ' → 'isom' 으로 바꿔치기해도 웹킷이 받아들이는지 (고치는 값이 이 4바이트면 가장 싸다)
   { name: 'test_synth_screenrec.mov', label: '합성 4초 · mov의 ftyp만 isom으로', patch: true },
   { name: 'probe_sanjo_remux.mov', label: '산조 6분 · mov의 ftyp만 isom으로', patch: true },
+  // 아이폰 카메라 촬영본 (2026-09-13 사용자 제공): ftyp qt, H.264+AAC, 공간음향 apac 트랙 별도
+  { name: 'probe_iphone.MOV', label: '아이폰 촬영본 8초 · MOV 원본 37MB' },
+  { name: 'probe_iphone_remux.mp4', label: '아이폰 촬영본 8초 · mp4로 리먹스 (코덱 그대로)' },
 ]
 
 /** QuickTime 컨테이너(ftyp major brand 'qt  ')를 'isom'으로만 바꾼다. 나머지 바이트는 그대로. */
