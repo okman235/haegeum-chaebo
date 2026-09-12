@@ -4,7 +4,7 @@ import { pyin } from './pyin'
 export interface PitchRequest { data: Float32Array; sr: number }
 export type PitchResponse =
   | { type: 'progress'; ratio: number }
-  | { type: 'result'; f0: Float32Array; times: Float32Array; voicedProb: Float32Array; sr: number; hop: number; frame: number }
+  | { type: 'result'; f0: Float32Array; times: Float32Array; voicedProb: Float32Array; sr: number; hop: number; frame: number; computeMs: number }
 
 const post = (msg: PitchResponse, transfer: Transferable[] = []) =>
   (self as unknown as Worker).postMessage(msg, transfer)
@@ -12,10 +12,11 @@ const post = (msg: PitchResponse, transfer: Transferable[] = []) =>
 self.onmessage = (e: MessageEvent<PitchRequest>) => {
   const { data, sr } = e.data
   let last = 0
+  const t0 = performance.now()
   const r = pyin(data, {
     sr,
     onProgress: (ratio) => { if (ratio - last >= 0.01) { last = ratio; post({ type: 'progress', ratio }) } },
   })
-  post({ type: 'result', f0: r.f0, times: r.times, voicedProb: r.voicedProb, sr: r.sr, hop: r.hop, frame: r.frame },
+  post({ type: 'result', f0: r.f0, times: r.times, voicedProb: r.voicedProb, sr: r.sr, hop: r.hop, frame: r.frame, computeMs: performance.now() - t0 },
     [r.f0.buffer, r.times.buffer, r.voicedProb.buffer])
 }

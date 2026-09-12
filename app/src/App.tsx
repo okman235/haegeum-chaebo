@@ -20,9 +20,13 @@ export default function App() {
     const name = file.name.replace(/\.[^.]+$/, '')
     setPhase({ kind: 'analyzing', name, stage: 'decode', ratio: 0 })
     try {
+      const t0 = performance.now()
       const d = await decodeFile(file)
+      const t1 = performance.now()
       setPhase({ kind: 'analyzing', name, stage: 'pitch', ratio: 0 })
       const pitch = await analyzePitch(d.mono, ANALYSIS_SR, (ratio) => setPhase({ kind: 'analyzing', name, stage: 'pitch', ratio }))
+      const t2 = performance.now()
+      console.info(`[timing] 디코드+리샘플 ${Math.round(t1 - t0)}ms · 음높이 추적 ${Math.round(t2 - t1)}ms · 길이 ${d.duration.toFixed(1)}s`)
       setPhase({ kind: 'ready', project: { name, buffer: d.buffer, duration: d.duration, peaks: d.peaks, pitch } })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
