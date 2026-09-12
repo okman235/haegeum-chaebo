@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+# 녹음·영상 샘플은 개인 자료라 저장소에 넣지 않음
+samples/*
+!samples/.gitkeep
+# 디자인 캔버스 산출물 (design/gen_design.py + *.dc.html 에서 다시 만듦)
+design/haegeum-transcriber-screens.html

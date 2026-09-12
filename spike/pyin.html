@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v0.0 스파이크 — YIN 엔진 비교</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 16px; color: #222; }
+  h1 { font-size: 18px; }
+  canvas { width: 100%; height: 260px; border: 1px solid #ccc; display: block; }
+  pre { background: #f5f5f5; padding: 10px; font-size: 13px; white-space: pre-wrap; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+  label { font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>v0.0 스파이크 — 브라우저 단독 음높이 추적 (pitchfinder YIN / essentia PitchYin)</h1>
+<div class="row">
+  <input type="file" id="file" accept="audio/*">
+  <label>hop <input id="hop" type="number" value="256" style="width:70px"></label>
+  <label>frame <input id="frame" type="number" value="2048" style="width:70px"></label>
+  <label>엔진 <select id="engine"><option value="yin-js">pitchfinder YIN (JS)</option><option value="yin-wasm">essentia PitchYin (WASM)</option></select></label>
+  <button id="rerun">다시 분석</button>
+  <span id="status">로딩…</span>
+</div>
+<canvas id="cv" width="1600" height="520"></canvas>
+<pre id="out">(결과 대기)</pre>
+
+<script type="module">
+import { EssentiaWASM } from 'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.es.js';
+import Essentia from 'https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.es.js';
+import * as PF from 'https://cdn.jsdelivr.net/npm/pitchfinder@2.3.4/+esm';
+
+const $ = id => document.getElementById(id);
+const status = t => { $('status').textContent = t; };
+let essentia, lastBuffer = null, lastName = '';
+
+const cents = (f, ref) => 1200 * Math.log2(f / ref);
+const median = a => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : NaN; };
+
+async function decode(arrayBuffer) {
+  const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
+  const buf = await ctx.decodeAudioData(arrayBuffer);
+  return { sr: buf.sampleRate, data: buf.getChannelData(0), dur: buf.duration };
+}
+
+function analyze({ sr, data, dur }) {
+  const hop = +$('hop').value, frame = +$('frame').value, engine = $('engine').value;
+  const n = Math.floor((data.length - frame) / hop) + 1;
+  const f0 = new Float32Array(n), vp = new Float32Array(n);
+  const t0 = performance.now();
+  if (engine === 'yin-js') {
+    const det = PF.YIN({ sampleRate: sr, threshold: 0.1 });
+    for (let i = 0; i < n; i++) { const p = det(data.subarray(i * hop, i * hop + frame)); f0[i] = p || 0; vp[i] = p ? 1 : 0; }
+  } else {
+    for (let i = 0; i < n; i++) {
+      const v = essentia.arrayToVector(data.subarray(i * hop, i * hop + frame));
+      const r = essentia.PitchYin(v, frame, true, 1500, 80, sr, 0.15);
+      v.delete();
+      vp[i] = r.pitchConfidence; f0[i] = r.pitchConfidence > 0.5 ? r.pitch : 0;
+    }
+  }
+  const ms = performance.now() - t0;
+  return { f0, vp, hop, frame, sr, dur, ms, engine };
+}
+
+function summarize(a) {
+  const { f0, vp, hop, sr, dur, ms } = a;
+  const secPerFrame = hop / sr;
+  const lines = [];
+  lines.push(`엔진: ${a.engine}`);
+  lines.push(`파일: ${lastName}  길이 ${dur.toFixed(2)}s  sr ${sr}  프레임 ${f0.length} (hop ${hop})`);
+  lines.push(`분석 시간: ${ms.toFixed(0)} ms  → 실시간 대비 ${(dur * 1000 / ms).toFixed(1)}x`);
+  const voiced = f0.filter(v => v > 0).length;
+  lines.push(`유성 프레임 비율: ${(100 * voiced / f0.length).toFixed(1)}%`);
+  lines.push('--- 1초 단위 요약 (중앙값 Hz / 유성% / 반음 대비 편차 / 1초 안 변동폭 센트) ---');
+  for (let s = 0; s < Math.ceil(dur); s++) {
+    const i0 = Math.floor(s / secPerFrame), i1 = Math.min(f0.length, Math.floor((s + 1) / secPerFrame));
+    const seg = Array.from(f0.slice(i0, i1)).filter(v => v > 0);
+    if (!seg.length) { lines.push(`${s}-${s + 1}s: 무성`); continue; }
+    const med = median(seg);
+    const midi = 69 + 12 * Math.log2(med / 440);
+    const nearest = 440 * Math.pow(2, (Math.round(midi) - 69) / 12);
+    const dev = cents(med, nearest);
+    const c = seg.map(v => cents(v, med));
+    const pp = Math.max(...c) - Math.min(...c);
+    const first = seg[0], last = seg[seg.length - 1];
+    lines.push(`${s}-${s + 1}s: ${med.toFixed(1)} Hz  유성 ${(100 * seg.length / (i1 - i0)).toFixed(0)}%  MIDI ${Math.round(midi)} (${dev >= 0 ? '+' : ''}${dev.toFixed(0)}c)  변동폭 ${pp.toFixed(0)}c  시작→끝 ${first.toFixed(0)}→${last.toFixed(0)} Hz`);
+  }
+  return lines.join('\n');
+}
+
+function draw(a) {
+  const cv = $('cv'), g = cv.getContext('2d');
+  const { f0, hop, sr, dur } = a;
+  g.clearRect(0, 0, cv.width, cv.height);
+  const fmin = 100, fmax = 1200;
+  const y = f => cv.height - (Math.log2(f / fmin) / Math.log2(fmax / fmin)) * cv.height;
+  g.strokeStyle = '#ddd'; g.lineWidth = 1;
+  for (let m = 43; m <= 86; m++) { const f = 440 * Math.pow(2, (m - 69) / 12); if (f < fmin || f > fmax) continue; g.beginPath(); g.moveTo(0, y(f)); g.lineTo(cv.width, y(f)); g.stroke(); }
+  g.fillStyle = '#c33';
+  for (let i = 0; i < f0.length; i++) { if (f0[i] <= 0) continue; const x = (i * hop / sr) / dur * cv.width; g.fillRect(x, y(f0[i]) - 1.5, 2, 3); }
+}
+
+async function run() {
+  if (!lastBuffer) return;
+  status('분석 중…');
+  await new Promise(r => setTimeout(r, 10));
+  try {
+    const a = analyze(lastBuffer);
+    draw(a);
+    $('out').textContent = summarize(a);
+    status('완료');
+  } catch (e) { $('out').textContent = 'ERROR: ' + (e.stack || e); status('실패'); }
+}
+
+async function loadArrayBuffer(ab, name) {
+  lastName = name; status('디코딩…');
+  lastBuffer = await decode(ab);
+  await run();
+}
+
+$('file').addEventListener('change', async e => { const f = e.target.files[0]; if (f) await loadArrayBuffer(await f.arrayBuffer(), f.name); });
+$('rerun').addEventListener('click', run);
+$('engine').addEventListener('change', run);
+
+try {
+  essentia = new Essentia(EssentiaWASM);
+  status(`essentia.js ${essentia.version} + pitchfinder 준비됨 — 합성음 자동 로드`);
+  const res = await fetch('../samples/test_synth.wav');
+  await loadArrayBuffer(await res.arrayBuffer(), 'test_synth.wav');
+} catch (e) { $('out').textContent = 'INIT ERROR: ' + (e.stack || e); status('초기화 실패'); }
+</script>
+</body>
+</html>
