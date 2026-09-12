@@ -9,9 +9,17 @@ export interface Decoded {
 
 /** 오디오/영상 파일을 브라우저 디코더로 풀고, 분석용으로 22.05 kHz 모노를 따로 만든다. 영상은 소리 트랙만 쓴다. */
 export async function decodeFile(file: File): Promise<Decoded> {
-  const bytes = await file.arrayBuffer()
   const ctx = new OfflineAudioContext(1, 1, 44100)
-  const buffer = await ctx.decodeAudioData(bytes)
+  let buffer: AudioBuffer
+  try {
+    buffer = await ctx.decodeAudioData(await file.arrayBuffer())
+  } catch {
+    // 사파리는 .mov와 Opus를 여기서 거부한다. 소리 트랙을 직접 뜯어 온다 (movDecode.ts).
+    const { decodeAudioTrack } = await import('./movDecode')
+    const { channels, sampleRate } = await decodeAudioTrack(await file.arrayBuffer())
+    buffer = new AudioBuffer({ length: channels[0].length, sampleRate, numberOfChannels: channels.length })
+    channels.forEach((ch, i) => buffer.copyToChannel(ch, i))
+  }
   const mono = await resampleMono(buffer, ANALYSIS_SR)
   return { buffer, mono, duration: buffer.duration, peaks: computePeaks(mono) }
 }
