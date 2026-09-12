@@ -8,9 +8,13 @@ const ROOT = '/Users/sangholee/채보앱'
 const fsUrl = (name: string) => '/@fs' + encodeURI(`${ROOT}/samples/${name}`.normalize('NFD'))
 
 const SAMPLES = [
-  { name: 'hg_180_240.wav', label: '해금 60초 (wav)' },
-  { name: 'hg_0_90.wav', label: '해금 90초 (wav)' },
-  { name: '지영희류 해금산조 | 중중모리 굿거리 자진모리 [aMVcDNpiVBM].mp4', label: '산조 영상 전체 (mp4 72MB)' },
+  { name: 'hg_180_240.wav', label: '해금 60초 · wav' },
+  { name: 'hg_0_90.wav', label: '해금 90초 · wav' },
+  // 영상 디코드 진단 (2026-09-13 아이패드에서 원본 mp4가 EncodingError)
+  { name: 'test_synth_screenrec.mov', label: '작은 영상 4초 · mov H.264+AAC' },
+  { name: '지영희류 해금산조 | 중중모리 굿거리 자진모리 [aMVcDNpiVBM].mp4', label: '산조 6분 · mp4 VP9+Opus 72MB (유튜브 원본)' },
+  { name: 'probe_sanjo_aac.m4a', label: '산조 6분 · m4a AAC 소리만 6MB' },
+  { name: 'probe_sanjo_h264_aac.mp4', label: '산조 6분 · mp4 H.264+AAC 79MB' },
 ]
 
 const $ = (id: string) => document.getElementById(id)!
