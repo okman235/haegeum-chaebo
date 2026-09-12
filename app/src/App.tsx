@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Project } from './types'
+import { ANALYSIS_SR, type Project } from './types'
 import { decodeFile } from './audio/decode'
 import { analyzePitch } from './audio/analyze'
 import { Player } from './audio/player'
@@ -22,8 +22,8 @@ export default function App() {
     try {
       const d = await decodeFile(file)
       setPhase({ kind: 'analyzing', name, stage: 'pitch', ratio: 0 })
-      const pitch = await analyzePitch(d.mono, d.sr, (ratio) => setPhase({ kind: 'analyzing', name, stage: 'pitch', ratio }))
-      setPhase({ kind: 'ready', project: { name, buffer: d.buffer, sr: d.sr, duration: d.duration, peaks: d.peaks, pitch } })
+      const pitch = await analyzePitch(d.mono, ANALYSIS_SR, (ratio) => setPhase({ kind: 'analyzing', name, stage: 'pitch', ratio }))
+      setPhase({ kind: 'ready', project: { name, buffer: d.buffer, duration: d.duration, peaks: d.peaks, pitch } })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setPhase({ kind: 'analyzing', name, stage: 'decode', ratio: 0,
@@ -72,7 +72,7 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
       <TopBar name={project.name} playing={playing} time={playhead} duration={project.duration} selection={selection}
         onBack={onBack} onTogglePlay={togglePlay} onClearSelection={() => setSelection(null)} />
       <div className="workspace">
-        <CurveView pitch={project.pitch} peaks={project.peaks} sr={project.sr} duration={project.duration}
+        <CurveView pitch={project.pitch} peaks={project.peaks} duration={project.duration}
           playhead={playhead} playing={playing} selection={selection} onSeek={seek} onSelect={setSelection} />
       </div>
     </div>

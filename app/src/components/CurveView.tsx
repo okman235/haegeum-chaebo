@@ -6,7 +6,6 @@ import { fmtTime } from './TopBar'
 interface Props {
   pitch: PitchTrack
   peaks: Float32Array
-  sr: number
   duration: number
   playhead: number
   playing: boolean
@@ -24,7 +23,7 @@ const noteName = (m: number) => `${NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 
 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
-export function CurveView({ pitch, peaks, sr, duration, playhead, playing, selection, onSeek, onSelect }: Props) {
+export function CurveView({ pitch, peaks, duration, playhead, playing, selection, onSeek, onSelect }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -114,10 +113,10 @@ export function CurveView({ pitch, peaks, sr, duration, playhead, playing, selec
     }
 
     // 음높이 곡선 (보이는 구간만)
-    const { f0, times, hop } = pitch
+    const { f0, times, hop, sr } = pitch
     const t0 = view.start, t1 = view.start + visible
-    const i0 = Math.max(0, Math.floor((t0 * sr - pitch.frame / 2) / hop) - 1)
-    const i1 = Math.min(f0.length, Math.ceil((t1 * sr - pitch.frame / 2) / hop) + 2)
+    const i0 = Math.max(0, Math.floor(t0 * sr / hop) - 1)
+    const i1 = Math.min(f0.length, Math.ceil(t1 * sr / hop) + 2)
     const maxGap = hop * 3 / sr
     g.lineCap = 'round'; g.lineJoin = 'round'
     g.save(); g.beginPath(); g.rect(GUTTER, 0, w - GUTTER, plotBottom + 4); g.clip()
@@ -167,7 +166,7 @@ export function CurveView({ pitch, peaks, sr, duration, playhead, playing, selec
       g.beginPath(); g.moveTo(px, TOP - 8); g.lineTo(px, h - RULER); g.stroke()
       g.fillStyle = CYAN; g.beginPath(); g.moveTo(px - 5, TOP - 10); g.lineTo(px + 5, TOP - 10); g.lineTo(px, TOP - 2); g.closePath(); g.fill()
     }
-  }, [size, view, range, pitch, peaks, sr, duration, playhead, selection, visible, xOf, pxPerSec])
+  }, [size, view, range, pitch, peaks, duration, playhead, selection, visible, xOf, pxPerSec])
 
   // ---------- 입력 ----------
   const onPointerDown = (e: React.PointerEvent) => {

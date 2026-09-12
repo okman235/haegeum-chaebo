@@ -6,3 +6,7 @@ samples/*
 !samples/.gitkeep
 # 디자인 캔버스 산출물 (design/gen_design.py + *.dc.html 에서 다시 만듦)
 design/haegeum-transcriber-screens.html
+
+# 알고리즘 실험용 Python 환경
+research/.venv/
+research/*.npy
