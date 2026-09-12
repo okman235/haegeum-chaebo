@@ -1,34 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PitchTrack } from '../types'
 import { PEAK_STEP } from '../types'
+import type { Note, Tuning } from '../audio/notes'
+import { NATURAL, hzToMidi, midiToHz, noteName } from '../music'
 import { fmtTime } from './TopBar'
 
 interface Props {
   pitch: PitchTrack
   peaks: Float32Array
   duration: number
+  notes: Note[]
+  tuning: Tuning
+  selectedNote: number | null
   playhead: number
   playing: boolean
   selection: [number, number] | null
   onSeek: (t: number) => void
   onSelect: (range: [number, number] | null) => void
+  onSelectNote: (i: number) => void
 }
 
 const GUTTER = 56, RULER = 28, WAVE = 40, TOP = 18, WAVE_GAP = 10
 const MAX_PX_PER_SEC = 400
-const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-const NATURAL = new Set([0, 2, 4, 5, 7, 9, 11])
-const hzToMidi = (f: number) => 69 + 12 * Math.log2(f / 440)
-const noteName = (m: number) => `${NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`
 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
-export function CurveView({ pitch, peaks, duration, playhead, playing, selection, onSeek, onSelect }: Props) {
+export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote, playhead, playing, selection, onSeek, onSelect, onSelectNote }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [view, setView] = useState({ start: 0, pxPerSec: 0 })   // pxPerSec 0 = 아직 폭을 모름
-  const drag = useRef<{ x: number; t: number; moved: boolean } | null>(null)
+  const drag = useRef<{ x: number; y: number; t: number; moved: boolean } | null>(null)
   const pointers = useRef(new Map<number, number>())            // pointerId → x
   const pinch = useRef<{ dist: number; pxPerSec: number; centerT: number } | null>(null)
 
@@ -71,8 +73,25 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
       setView((v) => clampView(playhead - visible * 0.1, v.pxPerSec || fitPxPerSec))
   }, [playhead, playing, view.start, visible, clampView, fitPxPerSec])
 
+  // 오선보에서 고른 음이 화면 밖이면 그리로 옮긴다
+  useEffect(() => {
+    if (selectedNote === null) return
+    const n = notes[selectedNote]
+    if (!n) return
+    if (n.start < view.start || n.end > view.start + visible)
+      setView((v) => clampView(n.start - visible * 0.2, v.pxPerSec || fitPxPerSec))
+    // view 는 일부러 뺀다: 선택이 바뀔 때만 따라가고, 사용자가 스크롤할 땐 안 잡아끈다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNote, notes])
+
   const xOf = useCallback((t: number) => GUTTER + (t - view.start) * pxPerSec, [view.start, pxPerSec])
   const tOf = useCallback((x: number) => view.start + (x - GUTTER) / pxPerSec, [view.start, pxPerSec])
+
+  // 세로축은 A4=440 격자. 노트는 보정된 격자의 정수 midi 이므로 실제 주파수로 되돌려 자리를 잡는다
+  const plotBottom = size.h - RULER - WAVE - WAVE_GAP
+  const semiPx = (plotBottom - TOP) / (range.hi - range.lo)
+  const yOf = useCallback((m: number) => plotBottom - (m - range.lo) / (range.hi - range.lo) * (plotBottom - TOP), [plotBottom, range])
+  const bandMidi = useCallback((n: Note) => hzToMidi(midiToHz(n.midi, tuning.a4) * Math.pow(2, tuning.offsetCents / 1200)), [tuning])
 
   // ---------- 그리기 ----------
   useEffect(() => {
@@ -83,14 +102,11 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
     const g = cv.getContext('2d')!
     g.setTransform(dpr, 0, 0, dpr, 0, 0)
     const w = size.w, h = size.h
-    const plotBottom = h - RULER - WAVE - WAVE_GAP
     const { lo, hi } = range
-    const yOf = (m: number) => plotBottom - (m - lo) / (hi - lo) * (plotBottom - TOP)
     const AMBER = css('--amber'), CYAN = css('--cyan'), MUTED = css('--muted'), FAINT = css('--faint')
     g.clearRect(0, 0, w, h)
 
     // 반음 격자
-    const semiPx = (plotBottom - TOP) / (hi - lo)
     g.font = `11px ${css('--mono')}`
     g.textAlign = 'right'; g.textBaseline = 'middle'
     for (let m = lo; m <= hi; m++) {
@@ -112,9 +128,24 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
       }
     }
 
+    const t0 = view.start, t1 = view.start + visible
+
+    // 노트 띠 (보이는 것만). 선택된 음은 청록
+    const bandH = Math.max(4, semiPx * 0.9)
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i]
+      if (n.end < t0 || n.start > t1) continue
+      const x0 = Math.max(GUTTER, xOf(n.start)), x1 = Math.min(w, xOf(n.end))
+      const y = yOf(bandMidi(n))
+      const sel = i === selectedNote
+      g.fillStyle = sel ? 'rgba(92,200,232,0.45)' : 'rgba(242,180,90,0.30)'
+      g.fillRect(x0, y - bandH / 2, Math.max(1.5, x1 - x0), bandH)
+      if (!sel) { g.strokeStyle = 'rgba(242,180,90,0.55)'; g.lineWidth = 1; g.strokeRect(x0 + 0.5, y - bandH / 2 + 0.5, Math.max(1, x1 - x0 - 1), bandH - 1) }
+      if (sel) { g.strokeStyle = CYAN; g.lineWidth = 1; g.strokeRect(x0 + 0.5, y - bandH / 2 + 0.5, Math.max(1, x1 - x0 - 1), bandH - 1) }
+    }
+
     // 음높이 곡선 (보이는 구간만)
     const { f0, times, hop, sr } = pitch
-    const t0 = view.start, t1 = view.start + visible
     const i0 = Math.max(0, Math.floor(t0 * sr / hop) - 1)
     const i1 = Math.min(f0.length, Math.ceil(t1 * sr / hop) + 2)
     const maxGap = hop * 3 / sr
@@ -166,7 +197,7 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
       g.beginPath(); g.moveTo(px, TOP - 8); g.lineTo(px, h - RULER); g.stroke()
       g.fillStyle = CYAN; g.beginPath(); g.moveTo(px - 5, TOP - 10); g.lineTo(px + 5, TOP - 10); g.lineTo(px, TOP - 2); g.closePath(); g.fill()
     }
-  }, [size, view, range, pitch, peaks, duration, playhead, selection, visible, xOf, pxPerSec])
+  }, [size, view, range, pitch, peaks, duration, playhead, selection, visible, xOf, pxPerSec, notes, selectedNote, plotBottom, semiPx, yOf, bandMidi])
 
   // ---------- 입력 ----------
   const onPointerDown = (e: React.PointerEvent) => {
@@ -181,7 +212,16 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
       return
     }
     if (x < GUTTER) return
-    drag.current = { x, t: tOf(x), moved: false }
+    drag.current = { x, y: e.clientY - rect.top, t: tOf(x), moved: false }
+  }
+  // 탭한 자리에 노트 띠가 있으면 그 음의 번호
+  const noteAt = (t: number, y: number) => {
+    const tol = Math.max(6, semiPx * 0.6)
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i]
+      if (t >= n.start && t <= n.end && Math.abs(yOf(bandMidi(n)) - y) <= tol) return i
+    }
+    return -1
   }
   const onPointerMove = (e: React.PointerEvent) => {
     if (!pointers.current.has(e.pointerId)) return
@@ -209,7 +249,11 @@ export function CurveView({ pitch, peaks, duration, playhead, playing, selection
     if (pointers.current.size < 2) pinch.current = null
     const d = drag.current
     drag.current = null
-    if (d && !d.moved) { onSelect(null); onSeek(Math.min(duration, Math.max(0, d.t))) }
+    if (d && !d.moved) {
+      const i = noteAt(d.t, d.y)
+      if (i >= 0) onSelectNote(i)
+      else { onSelect(null); onSeek(Math.min(duration, Math.max(0, d.t))) }
+    }
   }
   const onWheel = (e: React.WheelEvent) => {
     const rect = host.current!.getBoundingClientRect()

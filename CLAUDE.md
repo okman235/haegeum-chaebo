@@ -6,7 +6,7 @@
 
 ## 지금 위치 (2026-09-13)
 
-v0.0 스파이크 ①②③ 전부 닫힘. v0.1(파일 열기 → f0 곡선 → 구간 재생) 동작. **다음은 v0.2 — 음 분할 + 조율 보정 + 오선보.**
+v0.0 스파이크 ①②③ 전부 닫힘. v0.1(파일 열기 → f0 곡선 → 구간 재생), v0.2(음 분할 + 조율 보정 + 오선보) 동작. **다음은 v0.3 — 리듬 양자화 + 음표 편집.** 분할 감도·onset 임계는 사용자가 들어 보고 정할 것 (`docs/2026-09-13-v0.2-음분할-오선보.md` 3장).
 
 ## 대상
 
@@ -38,4 +38,5 @@ pnpm --dir app build             # tsc -b && vite build
 ```
 
 - 측정 페이지 `/dev/bench.html`, pYIN 정확도 회귀 `/dev/pyin-test.html`, mov 우회로 `/dev/remux-test.html`
+- 앱을 파일 선택 없이 열기: `/?open=hg_180_240.wav` (개발 서버에서만, `samples/` 기준). 콘솔에서 `__notes`, `__segment({onsetDb, minMs, ...})` 로 분할 실험
 - `samples/` 는 개인 녹음이라 저장소에 안 들어간다 (`.gitignore`). `research/*.npy` 도 마찬가지.

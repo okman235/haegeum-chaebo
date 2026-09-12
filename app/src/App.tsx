@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ANALYSIS_SR, type Project } from './types'
 import { decodeFile } from './audio/decode'
 import { analyzePitch } from './audio/analyze'
+import { estimateOffsetCents, segmentNotes, type Note, type SegmentOptions } from './audio/notes'
 import { Player } from './audio/player'
 import { StartScreen } from './components/StartScreen'
 import { AnalyzingScreen, type Stage } from './components/AnalyzingScreen'
 import { TopBar } from './components/TopBar'
 import { CurveView } from './components/CurveView'
+import { StaffView } from './components/StaffView'
+import { TuningBar, type TuningState } from './components/TuningBar'
 
 type Phase =
   | { kind: 'start' }
@@ -35,6 +38,15 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const name = new URLSearchParams(location.search).get('open')
+    if (!name) return
+    const url = '/@fs' + encodeURI(`${__REPO_ROOT__}/samples/${name}`.normalize('NFD'))
+    fetch(url).then(async (r) => { if (!r.ok) throw new Error(`${r.status}`); openFile(new File([await r.blob()], name)) })
+      .catch((e) => console.error('[dev] ?open 실패', e))
+  }, [openFile])
+
   if (phase.kind === 'start') return <div className="app"><StartScreen onFile={openFile} /></div>
   if (phase.kind === 'analyzing')
     return <div className="app"><AnalyzingScreen name={phase.name} stage={phase.stage} ratio={phase.ratio} error={phase.error} onBack={() => setPhase({ kind: 'start' })} /></div>
@@ -46,6 +58,20 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const [playing, setPlaying] = useState(false)
   const [playhead, setPlayhead] = useState(0)
   const [selection, setSelection] = useState<[number, number] | null>(null)
+  const [tuningState, setTuningState] = useState<TuningState>({ a4: 440, useOffset: true, splitSemis: 0.6 })
+  const [sel, setSel] = useState<{ i: number; of: Note[] } | null>(null)
+
+  // 조율 편차는 A4 가 바뀔 때만, 분할은 설정이 바뀔 때만 다시 (둘 다 수십 ms)
+  const estimatedOffset = useMemo(() => estimateOffsetCents(project.pitch, tuningState.a4), [project, tuningState.a4])
+  const tuning = useMemo(() => ({ a4: tuningState.a4, offsetCents: tuningState.useOffset ? estimatedOffset : 0 }), [tuningState, estimatedOffset])
+  const notes = useMemo(() => segmentNotes(project.pitch, project.peaks, tuning, { splitSemis: tuningState.splitSemis }), [project, tuning, tuningState.splitSemis])
+  // 선택은 그때의 notes 배열에 묶인다 — 다시 분할되면 자동으로 풀림
+  const selectedNote = sel && sel.of === notes ? sel.i : null
+  if (import.meta.env.DEV) {   // 개발 콘솔에서 분할 결과·옵션 실험을 하려고
+    const w = window as unknown as { __notes: Note[]; __segment: (o: SegmentOptions) => Note[] }
+    w.__notes = notes
+    w.__segment = (o) => segmentNotes(project.pitch, project.peaks, tuning, o)
+  }
 
   useEffect(() => {
     const p = new Player(project.buffer)
@@ -70,14 +96,26 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
     else p.play(p.currentTime >= project.duration - 0.05 ? 0 : p.currentTime)
   }
   const seek = (t: number) => { player.current?.seek(t); setPlayhead(t) }
+  // 음을 고르면 그 구간이 선택되고 재생 헤드가 앞으로 간다 → 재생 버튼이 그 음만 들려준다
+  const selectNote = (i: number) => {
+    const n = notes[i]
+    if (!n) return
+    setSel({ i, of: notes }); setSelection([n.start, n.end]); seek(n.start)
+  }
+  const clearSelection = () => { setSelection(null); setSel(null) }
+  const select = (r: [number, number] | null) => { setSelection(r); setSel(null) }
 
   return (
     <div className="app">
       <TopBar name={project.name} playing={playing} time={playhead} duration={project.duration} selection={selection}
-        onBack={onBack} onTogglePlay={togglePlay} onClearSelection={() => setSelection(null)} />
+        onBack={onBack} onTogglePlay={togglePlay} onClearSelection={clearSelection} />
       <div className="workspace">
         <CurveView pitch={project.pitch} peaks={project.peaks} duration={project.duration}
-          playhead={playhead} playing={playing} selection={selection} onSeek={seek} onSelect={setSelection} />
+          notes={notes} tuning={tuning} selectedNote={selectedNote}
+          playhead={playhead} playing={playing} selection={selection} onSeek={seek} onSelect={select} onSelectNote={selectNote} />
+        <TuningBar state={tuningState} estimatedOffset={estimatedOffset} notes={notes}
+          selected={selectedNote !== null ? notes[selectedNote] ?? null : null} onChange={setTuningState} />
+        <StaffView notes={notes} selected={selectedNote} playhead={playhead} playing={playing} onSelectNote={selectNote} />
       </div>
     </div>
   )

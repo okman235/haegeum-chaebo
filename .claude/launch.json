@@ -25,6 +25,20 @@
         "5173"
       ],
       "port": 5173
+    },
+    {
+      "name": "app-dev-5174",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "app",
+        "dev",
+        "--host",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174
     }
   ]
 }
