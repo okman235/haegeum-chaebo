@@ -5,6 +5,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages 는 저장소 이름 아래에 뜨므로 워크플로에서 BASE_PATH=/저장소명/ 을 준다
+  base: process.env.BASE_PATH ?? '/',
   plugins: [
     react(),
     // 홈 화면 설치 + 오프라인. 설치는 HTTPS 에서만 되므로(localhost 제외) 배포 뒤에 실기기 확인

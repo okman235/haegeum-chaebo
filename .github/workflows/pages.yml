@@ -1,0 +1,37 @@
+# GitHub Pages 배포. main 에 푸시하면 app/ 을 빌드해 올린다.
+# 저장소 하위 경로(https://okman235.github.io/haegeum-chaebo/)라 BASE_PATH 로 base 를 준다.
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: pnpm, cache-dependency-path: app/pnpm-lock.yaml }
+      - run: pnpm --dir app install --frozen-lockfile
+      - run: pnpm --dir app build
+        env: { BASE_PATH: "/${{ github.event.repository.name }}/" }
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: app/dist }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
