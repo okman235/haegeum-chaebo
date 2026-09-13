@@ -6,7 +6,7 @@
 
 ## 지금 위치 (2026-09-13)
 
-v0.0 스파이크 ①②③ 닫힘. v0.1(f0 곡선·구간 재생), v0.2(음 분할·조율·오선보), v0.3(장단 격자·마디·편집), v0.5(IndexedDB 저장·내보내기 4종·PWA) 동작. **다음은 호스팅 → 아이패드 설치 → v1.0 아들 도그푸딩.** v0.4 시김새는 아들 부호 사진이 있어야 한다.
+v0.0 스파이크 ①②③ 닫힘. v0.1(f0 곡선·구간 재생), v0.2(음 분할·조율·오선보), v0.3(장단 격자·마디·편집), v0.5(IndexedDB 저장·내보내기 4종·PWA) 동작. **배포됨: https://okman235.github.io/haegeum-chaebo/** (main 푸시 → Actions 자동 배포, 약 1분). **다음은 아이패드 설치 확인 → v1.0 아들 도그푸딩.** v0.4 시김새는 아들 부호 사진이 있어야 한다.
 
 **사용자(아버지)는 해금을 모른다.** 귀로 판단할 것(분할 감도, 프리셋 값, 박자표, 시김새 부호)은 묻지 말고 아들 방문 때 확인할 목록으로 모은다 — 기획서 11장.
 
@@ -37,7 +37,10 @@ v0.0 스파이크 ①②③ 닫힘. v0.1(f0 곡선·구간 재생), v0.2(음 분
 ```bash
 pnpm --dir app dev --host        # 개발 서버 (LAN 공개, 실기기 확인용)
 pnpm --dir app build             # tsc -b && vite build
+git push                         # → GitHub Pages 자동 배포 (gh run watch 로 확인)
 ```
+
+- 원격은 SSH(`git@github.com:okman235/haegeum-chaebo.git`). gh 의 OAuth 토큰엔 `workflow` 스코프가 없어 https 푸시는 워크플로 파일에서 거부된다.
 
 - 측정 페이지 `/dev/bench.html`, pYIN 정확도 회귀 `/dev/pyin-test.html`, mov 우회로 `/dev/remux-test.html`
 - 앱을 파일 선택 없이 열기: `/?open=hg_180_240.wav` (개발 서버에서만, `samples/` 기준). 콘솔에서 `__notes`, `__segment({onsetDb, minMs, ...})` 로 분할 실험
