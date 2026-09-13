@@ -122,3 +122,10 @@ button:disabled { opacity: 0.4; cursor: default; }
 .staff g.cur * { fill: var(--amber) !important; stroke: var(--amber) !important; }
 .staff g.sel * { fill: var(--cyan) !important; stroke: var(--cyan) !important; }
 .staff__empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 13px; }
+
+/* ---------- 리듬 띠 · 편집 버튼 ---------- */
+.tuning--rhythm { border-top: none; }
+.tuning__select { background: var(--surf2); border: 1px solid var(--line); color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 13px; }
+.btn--small { padding: 4px 10px; font-size: 12px; background: var(--surf2); color: var(--text); border-radius: 6px; }
+.btn--danger { color: #f08a8a; }
+.editbtns { display: inline-flex; gap: 4px; margin-left: 10px; }

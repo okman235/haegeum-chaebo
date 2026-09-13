@@ -1,6 +1,6 @@
 // 조율·분할 설정 띠. 값은 여기서 사용자가 정한다 — 코드에 해금 조율을 박아 두지 않는다.
 import { noteName } from '../music'
-import type { Note } from '../audio/notes'
+import type { Note, NoteEdit } from '../audio/notes'
 
 export interface TuningState {
   a4: number
@@ -14,11 +14,12 @@ interface Props {
   notes: Note[]
   selected: Note | null
   onChange: (s: TuningState) => void
+  onEdit: (e: NoteEdit) => void   // 선택 음에 편집을 더한다 (transpose 는 누적, dStart/dEnd 는 격자 칸 누적)
 }
 
 const fmtCents = (c: number) => `${c >= 0 ? '+' : '−'}${Math.abs(c).toFixed(0)}c`
 
-export function TuningBar({ state, estimatedOffset, notes, selected, onChange }: Props) {
+export function TuningBar({ state, estimatedOffset, notes, selected, onChange, onEdit }: Props) {
   return (
     <div className="tuning">
       <label className="tuning__item">
@@ -38,11 +39,20 @@ export function TuningBar({ state, estimatedOffset, notes, selected, onChange }:
         <span className="tuning__val">{state.splitSemis.toFixed(2)}반음</span>
       </label>
       <span className="tuning__spacer" />
-      <span className="tuning__info">
-        {selected
-          ? <>{noteName(selected.midi)} <span className="tuning__val">{fmtCents(selected.cents)}</span> · {(selected.end - selected.start).toFixed(2)}s</>
-          : <>음 {notes.length}개</>}
-      </span>
+      {selected ? (
+        <span className="tuning__item">
+          <span className="tuning__info">{noteName(selected.midi)} <span className="tuning__val">{fmtCents(selected.cents)}</span> · {(selected.end - selected.start).toFixed(2)}s</span>
+          <span className="editbtns">
+            <button className="btn btn--small" onClick={() => onEdit({ transpose: 1 })} title="반음 올림">♯</button>
+            <button className="btn btn--small" onClick={() => onEdit({ transpose: -1 })} title="반음 내림">♭</button>
+            <button className="btn btn--small" onClick={() => onEdit({ dStart: -1 })} title="시작을 한 칸 앞으로">시작◀</button>
+            <button className="btn btn--small" onClick={() => onEdit({ dStart: 1 })} title="시작을 한 칸 뒤로">▶</button>
+            <button className="btn btn--small" onClick={() => onEdit({ dEnd: -1 })} title="끝을 한 칸 앞으로">끝◀</button>
+            <button className="btn btn--small" onClick={() => onEdit({ dEnd: 1 })} title="끝을 한 칸 뒤로">▶</button>
+            <button className="btn btn--small btn--danger" onClick={() => onEdit({ deleted: true })} title="이 음을 지움">지움</button>
+          </span>
+        </span>
+      ) : <span className="tuning__info">음 {notes.filter((n) => !n.deleted).length}개</span>}
     </div>
   )
 }

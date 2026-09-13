@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ANALYSIS_SR, type Project } from './types'
 import { decodeFile } from './audio/decode'
 import { analyzePitch } from './audio/analyze'
-import { estimateOffsetCents, segmentNotes, type Note, type SegmentOptions } from './audio/notes'
+import { applyEdits, editKey, estimateOffsetCents, segmentNotes, type Note, type NoteEdit, type SegmentOptions } from './audio/notes'
+import { JANGDAN, gridInfo, quantize, type Grid } from './audio/rhythm'
 import { Player } from './audio/player'
 import { StartScreen } from './components/StartScreen'
 import { AnalyzingScreen, type Stage } from './components/AnalyzingScreen'
@@ -10,6 +11,7 @@ import { TopBar } from './components/TopBar'
 import { CurveView } from './components/CurveView'
 import { StaffView } from './components/StaffView'
 import { TuningBar, type TuningState } from './components/TuningBar'
+import { RhythmBar } from './components/RhythmBar'
 
 type Phase =
   | { kind: 'start' }
@@ -64,13 +66,21 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   // 조율 편차는 A4 가 바뀔 때만, 분할은 설정이 바뀔 때만 다시 (둘 다 수십 ms)
   const estimatedOffset = useMemo(() => estimateOffsetCents(project.pitch, tuningState.a4), [project, tuningState.a4])
   const tuning = useMemo(() => ({ a4: tuningState.a4, offsetCents: tuningState.useOffset ? estimatedOffset : 0 }), [tuningState, estimatedOffset])
-  const notes = useMemo(() => segmentNotes(project.pitch, project.peaks, tuning, { splitSemis: tuningState.splitSemis }), [project, tuning, tuningState.splitSemis])
-  // 선택은 그때의 notes 배열에 묶인다 — 다시 분할되면 자동으로 풀림
-  const selectedNote = sel && sel.of === notes ? sel.i : null
+  const rawNotes = useMemo(() => segmentNotes(project.pitch, project.peaks, tuning, { splitSemis: tuningState.splitSemis }), [project, tuning, tuningState.splitSemis])
+
+  // 리듬 격자 + 편집. 편집은 원 노트의 시작 시각이 열쇠라 다시 분할돼도 같은 자리면 살아남는다
+  const [grid, setGrid] = useState<Grid>({ preset: JANGDAN[2], unit: 8, bpm: 60, anchor: 0 })
+  const [edits, setEdits] = useState<Map<number, NoteEdit>>(() => new Map())
+  const info = useMemo(() => gridInfo(grid), [grid])
+  const notes = useMemo(() => applyEdits(rawNotes, edits, info.unitSec), [rawNotes, edits, info.unitSec])
+  const score = useMemo(() => quantize(notes, grid), [notes, grid])
+  // 선택은 그때의 분할 결과(rawNotes)에 묶인다 — 다시 분할되면 자동으로 풀리고, 편집만으로는 안 풀린다
+  const selectedNote = sel && sel.of === rawNotes ? sel.i : null
   if (import.meta.env.DEV) {   // 개발 콘솔에서 분할 결과·옵션 실험을 하려고
     const w = window as unknown as { __notes: Note[]; __segment: (o: SegmentOptions) => Note[] }
     w.__notes = notes
     w.__segment = (o) => segmentNotes(project.pitch, project.peaks, tuning, o)
+    ;(window as unknown as { __score: unknown }).__score = score
   }
 
   useEffect(() => {
@@ -100,10 +110,26 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
   const selectNote = (i: number) => {
     const n = notes[i]
     if (!n) return
-    setSel({ i, of: notes }); setSelection([n.start, n.end]); seek(n.start)
+    setSel({ i, of: rawNotes }); setSelection([n.start, n.end]); seek(n.start)
   }
   const clearSelection = () => { setSelection(null); setSel(null) }
   const select = (r: [number, number] | null) => { setSelection(r); setSel(null) }
+  const editSelected = (e: NoteEdit) => {
+    if (selectedNote === null) return
+    const k = editKey(rawNotes[selectedNote])
+    setEdits((m) => {
+      const next = new Map(m)
+      const cur = next.get(k) ?? {}
+      next.set(k, {
+        transpose: (cur.transpose ?? 0) + (e.transpose ?? 0),
+        dStart: (cur.dStart ?? 0) + (e.dStart ?? 0),
+        dEnd: (cur.dEnd ?? 0) + (e.dEnd ?? 0),
+        deleted: cur.deleted || e.deleted,
+      })
+      return next
+    })
+    if (e.deleted) { setSel(null); setSelection(null) }
+  }
 
   return (
     <div className="app">
@@ -111,11 +137,12 @@ function Workspace({ project, onBack }: { project: Project; onBack: () => void }
         onBack={onBack} onTogglePlay={togglePlay} onClearSelection={clearSelection} />
       <div className="workspace">
         <CurveView pitch={project.pitch} peaks={project.peaks} duration={project.duration}
-          notes={notes} tuning={tuning} selectedNote={selectedNote}
+          notes={notes} tuning={tuning} selectedNote={selectedNote} grid={grid} gridInfo={info}
           playhead={playhead} playing={playing} selection={selection} onSeek={seek} onSelect={select} onSelectNote={selectNote} />
         <TuningBar state={tuningState} estimatedOffset={estimatedOffset} notes={notes}
-          selected={selectedNote !== null ? notes[selectedNote] ?? null : null} onChange={setTuningState} />
-        <StaffView notes={notes} selected={selectedNote} playhead={playhead} playing={playing} onSelectNote={selectNote} />
+          selected={selectedNote !== null ? notes[selectedNote] ?? null : null} onChange={setTuningState} onEdit={editSelected} />
+        <RhythmBar grid={grid} playhead={playhead} onChange={setGrid} />
+        <StaffView score={score} notes={notes} selected={selectedNote} playhead={playhead} playing={playing} onSelectNote={selectNote} />
       </div>
     </div>
   )

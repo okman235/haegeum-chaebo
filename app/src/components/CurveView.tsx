@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PitchTrack } from '../types'
 import { PEAK_STEP } from '../types'
 import type { Note, Tuning } from '../audio/notes'
+import type { Grid, GridInfo } from '../audio/rhythm'
 import { NATURAL, hzToMidi, midiToHz, noteName } from '../music'
 import { fmtTime } from './TopBar'
 
@@ -12,6 +13,8 @@ interface Props {
   notes: Note[]
   tuning: Tuning
   selectedNote: number | null
+  grid: Grid
+  gridInfo: GridInfo
   playhead: number
   playing: boolean
   selection: [number, number] | null
@@ -25,7 +28,7 @@ const MAX_PX_PER_SEC = 400
 
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
-export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote, playhead, playing, selection, onSeek, onSelect, onSelectNote }: Props) {
+export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote, grid, gridInfo, playhead, playing, selection, onSeek, onSelect, onSelectNote }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
@@ -130,11 +133,33 @@ export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote,
 
     const t0 = view.start, t1 = view.start + visible
 
+    // 리듬 격자: 박은 희미하게, 마디는 진하게 + 마디 번호. 칸이 6px 보다 촘촘하면 박선은 생략
+    {
+      const { unitSec, unitsPerBeat, unitsPerBar } = gridInfo
+      const beatSec = unitSec * unitsPerBeat
+      const showBeats = beatSec * pxPerSec >= 6
+      const first = Math.floor((t0 - grid.anchor) / beatSec)
+      g.font = `10px ${css('--mono')}`; g.textAlign = 'left'; g.textBaseline = 'top'
+      for (let b = first; ; b++) {
+        const t = grid.anchor + b * beatSec
+        if (t > t1) break
+        const isBar = ((b % (unitsPerBar / unitsPerBeat)) + (unitsPerBar / unitsPerBeat)) % (unitsPerBar / unitsPerBeat) === 0
+        if (!isBar && !showBeats) continue
+        const x = Math.round(xOf(t)) + 0.5
+        if (x < GUTTER) continue
+        g.strokeStyle = isBar ? 'rgba(92,200,232,0.35)' : 'rgba(255,255,255,0.07)'
+        g.lineWidth = 1
+        g.beginPath(); g.moveTo(x, TOP - 8); g.lineTo(x, plotBottom + WAVE_GAP + WAVE); g.stroke()
+        if (isBar) { g.fillStyle = 'rgba(92,200,232,0.7)'; g.fillText(String(Math.round(b / (unitsPerBar / unitsPerBeat)) + 1), x + 3, TOP - 6) }
+      }
+      g.textBaseline = 'middle'
+    }
+
     // 노트 띠 (보이는 것만). 선택된 음은 청록
     const bandH = Math.max(4, semiPx * 0.9)
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i]
-      if (n.end < t0 || n.start > t1) continue
+      if (n.deleted || n.end < t0 || n.start > t1) continue
       const x0 = Math.max(GUTTER, xOf(n.start)), x1 = Math.min(w, xOf(n.end))
       const y = yOf(bandMidi(n))
       const sel = i === selectedNote
@@ -197,7 +222,7 @@ export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote,
       g.beginPath(); g.moveTo(px, TOP - 8); g.lineTo(px, h - RULER); g.stroke()
       g.fillStyle = CYAN; g.beginPath(); g.moveTo(px - 5, TOP - 10); g.lineTo(px + 5, TOP - 10); g.lineTo(px, TOP - 2); g.closePath(); g.fill()
     }
-  }, [size, view, range, pitch, peaks, duration, playhead, selection, visible, xOf, pxPerSec, notes, selectedNote, plotBottom, semiPx, yOf, bandMidi])
+  }, [size, view, range, pitch, peaks, duration, playhead, selection, visible, xOf, pxPerSec, notes, selectedNote, plotBottom, semiPx, yOf, bandMidi, grid, gridInfo])
 
   // ---------- 입력 ----------
   const onPointerDown = (e: React.PointerEvent) => {
@@ -219,7 +244,7 @@ export function CurveView({ pitch, peaks, duration, notes, tuning, selectedNote,
     const tol = Math.max(6, semiPx * 0.6)
     for (let i = 0; i < notes.length; i++) {
       const n = notes[i]
-      if (t >= n.start && t <= n.end && Math.abs(yOf(bandMidi(n)) - y) <= tol) return i
+      if (!n.deleted && t >= n.start && t <= n.end && Math.abs(yOf(bandMidi(n)) - y) <= tol) return i
     }
     return -1
   }

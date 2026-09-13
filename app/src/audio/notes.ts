@@ -20,6 +20,31 @@ export interface Note {
   midi: number    // 정수. 보정된 격자 기준
   cents: number   // 중앙값이 격자에서 벗어난 정도 (-50 ~ 50)
   frames: number  // 유성 프레임 수 (신뢰도 표시용)
+  deleted?: boolean   // 편집으로 지움 (번호를 유지하려고 배열에서 빼지 않는다)
+}
+
+/** 사용자 편집. 노트의 원래 시작 시각(ms 반올림)이 열쇠라, 다시 분할해도 같은 자리의 음이면 남는다. */
+export interface NoteEdit {
+  transpose?: number   // 반음
+  deleted?: boolean
+  dStart?: number      // 격자 칸 수 (리듬 격자 기준) — 초로 바꾸는 건 호출자
+  dEnd?: number
+}
+export const editKey = (n: Note) => Math.round(n.start * 1000)
+
+export function applyEdits(notes: Note[], edits: Map<number, NoteEdit>, unitSec: number): Note[] {
+  if (edits.size === 0) return notes
+  return notes.map((n) => {
+    const e = edits.get(editKey(n))
+    if (!e) return n
+    return {
+      ...n,
+      midi: n.midi + (e.transpose ?? 0),
+      start: n.start + (e.dStart ?? 0) * unitSec,
+      end: n.end + (e.dEnd ?? 0) * unitSec,
+      deleted: e.deleted,
+    }
+  })
 }
 
 /** 조율: 사용자가 정한 A4 와, 이 녹음이 그 격자에서 통째로 얼마나 벗어났는지(센트). 하드코딩 금지 — 값은 UI 에서 온다. */
