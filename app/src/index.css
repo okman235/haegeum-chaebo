@@ -129,3 +129,16 @@ button:disabled { opacity: 0.4; cursor: default; }
 .btn--small { padding: 4px 10px; font-size: 12px; background: var(--surf2); color: var(--text); border-radius: 6px; }
 .btn--danger { color: #f08a8a; }
 .editbtns { display: inline-flex; gap: 4px; margin-left: 10px; }
+
+/* ---------- 최근 프로젝트 · 내보내기 메뉴 · 저장 표시 ---------- */
+.recent { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.recent__main { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; background: var(--surf); border: 1px solid var(--line); border-radius: 10px; color: var(--text); text-align: left; }
+.recent__main:hover { background: var(--surf2); }
+.recent__name { font-weight: 500; }
+.recent__meta { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.recent__del { width: 32px; height: 32px; font-size: 18px; }
+.menu { position: relative; }
+.menu__list { position: absolute; right: 0; top: 100%; margin-top: 6px; min-width: 180px; background: #16232a; border: 1px solid var(--line); border-radius: 10px; padding: 6px; z-index: 10; box-shadow: 0 10px 30px rgba(0,0,0,0.4); display: flex; flex-direction: column; }
+.menu__list button { text-align: left; padding: 9px 12px; border-radius: 6px; color: var(--text); font-size: 13px; }
+.menu__list button:hover { background: var(--surf2); }
+.saved { font-size: 12px; color: var(--faint); font-family: var(--mono); min-width: 56px; text-align: right; }

@@ -1,10 +1,20 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FolderIcon } from './icons'
+import { deleteProject, listProjects, type ProjectMeta } from '../storage'
+import { fmtTime } from './TopBar'
 
-interface Props { onFile: (file: File) => void }
+interface Props { onFile: (file: File) => void; onOpenSaved: (id: string) => void }
 
-export function StartScreen({ onFile }: Props) {
+const fmtDate = (ms: number) => {
+  const d = new Date(ms)
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+export function StartScreen({ onFile, onOpenSaved }: Props) {
   const input = useRef<HTMLInputElement>(null)
+  const [recent, setRecent] = useState<ProjectMeta[] | null>(null)
+  useEffect(() => { listProjects().then(setRecent, () => setRecent([])) }, [])
+  const remove = async (id: string) => { await deleteProject(id); setRecent((r) => r?.filter((p) => p.id !== id) ?? null) }
   return (
     <div className="start">
       <div className="start__left">
@@ -22,7 +32,17 @@ export function StartScreen({ onFile }: Props) {
       </div>
       <div className="start__right">
         <div className="start__section">최근 프로젝트</div>
-        <div className="start__empty">아직 연 파일이 없습니다.</div>
+        {recent === null ? null : recent.length === 0
+          ? <div className="start__empty">아직 연 파일이 없습니다.</div>
+          : recent.map((p) => (
+            <div key={p.id} className="recent">
+              <button className="recent__main" onClick={() => onOpenSaved(p.id)}>
+                <span className="recent__name">{p.name}</span>
+                <span className="recent__meta">{fmtTime(p.duration)} · {fmtDate(p.savedAt)}</span>
+              </button>
+              <button className="iconbtn recent__del" onClick={() => remove(p.id)} aria-label="지우기">×</button>
+            </div>
+          ))}
       </div>
     </div>
   )

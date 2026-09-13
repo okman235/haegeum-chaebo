@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { BackIcon, CloseIcon, PauseIcon, PlayIcon } from './icons'
 
 interface Props {
@@ -9,7 +10,11 @@ interface Props {
   onBack: () => void
   onTogglePlay: () => void
   onClearSelection: () => void
+  onExport: (kind: ExportKind) => void
+  saved: 'saving' | 'saved' | 'error' | null
 }
+
+export type ExportKind = 'png' | 'print' | 'musicxml' | 'midi'
 
 export const fmtTime = (t: number) => {
   const m = Math.floor(t / 60)
@@ -17,7 +22,16 @@ export const fmtTime = (t: number) => {
   return `${String(m).padStart(2, '0')}:${s.toFixed(1).padStart(4, '0')}`
 }
 
-export function TopBar({ name, playing, time, duration, selection, onBack, onTogglePlay, onClearSelection }: Props) {
+export function TopBar({ name, playing, time, duration, selection, onBack, onTogglePlay, onClearSelection, onExport, saved }: Props) {
+  const [menu, setMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!menu) return
+    const close = (e: PointerEvent) => { if (!menuRef.current?.contains(e.target as Node)) setMenu(false) }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [menu])
+  const pick = (k: ExportKind) => { setMenu(false); onExport(k) }
   return (
     <div className="topbar">
       <div className="topbar__group">
@@ -38,7 +52,20 @@ export function TopBar({ name, playing, time, duration, selection, onBack, onTog
         <span className="time">{fmtTime(time)}</span>
         <span className="time time--total">/ {fmtTime(duration)}</span>
       </div>
-      <div className="topbar__group" />
+      <div className="topbar__group" style={{ justifyContent: 'flex-end', gap: 12 }}>
+        <span className="saved">{saved === 'saving' ? '저장 중…' : saved === 'saved' ? '저장됨' : saved === 'error' ? '저장 실패' : ''}</span>
+        <div className="menu" ref={menuRef}>
+          <button className="btn btn--ghost" onClick={() => setMenu((m) => !m)}>내보내기 ▾</button>
+          {menu && (
+            <div className="menu__list">
+              <button onClick={() => pick('print')}>악보 인쇄 · PDF</button>
+              <button onClick={() => pick('png')}>곡선 그림 (PNG)</button>
+              <button onClick={() => pick('musicxml')}>MusicXML</button>
+              <button onClick={() => pick('midi')}>MIDI</button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

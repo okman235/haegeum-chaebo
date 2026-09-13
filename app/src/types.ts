@@ -9,6 +9,7 @@ export interface PitchTrack {
 }
 
 export interface Project {
+  id: string            // IndexedDB 열쇠
   name: string
   buffer: AudioBuffer   // 재생용 (원래 샘플레이트)
   duration: number
