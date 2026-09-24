@@ -25,14 +25,6 @@ type Phase =
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: 'start' })
 
-  // 파일을 화면 아무 데나 떨어뜨려도 브라우저가 그 파일로 이동해 버리지 않게 막는다 (시작 화면이 자기 드롭을 처리)
-  useEffect(() => {
-    const block = (e: DragEvent) => { e.preventDefault() }
-    window.addEventListener('dragover', block)
-    window.addEventListener('drop', block)
-    return () => { window.removeEventListener('dragover', block); window.removeEventListener('drop', block) }
-  }, [])
-
   const openFile = useCallback(async (file: File) => {
     const name = file.name.replace(/\.[^.]+$/, '')
     setPhase({ kind: 'analyzing', name, stage: 'decode', ratio: 0 })

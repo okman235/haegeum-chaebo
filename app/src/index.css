@@ -39,9 +39,7 @@ button:disabled { opacity: 0.4; cursor: default; }
 .app { height: 100%; display: flex; flex-direction: column; }
 
 /* ---------- 시작 화면 ---------- */
-.start { flex: 1; display: flex; position: relative; }
-.start--drag::after { content: ''; position: absolute; inset: 12px; border: 2px dashed var(--amber); border-radius: 16px; background: rgba(242, 180, 90, 0.06); pointer-events: none; }
-.start__drop { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; color: var(--amber); pointer-events: none; z-index: 1; }
+.start { flex: 1; display: flex; }
 .start__left {
   width: 440px; flex-shrink: 0; padding: 52px 48px 40px; display: flex; flex-direction: column; gap: 28px;
   border-right: 1px solid var(--line); background: var(--surf);
