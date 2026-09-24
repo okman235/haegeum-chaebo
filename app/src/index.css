@@ -115,8 +115,9 @@ button:disabled { opacity: 0.4; cursor: default; }
 .tuning__info { font-family: var(--mono); color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 /* ---------- 오선보 ---------- */
-.staff { height: 150px; flex: none; overflow-x: auto; overflow-y: hidden; position: relative; background: rgba(0,0,0,0.18); -webkit-overflow-scrolling: touch; }
-.staff__svg { height: 130px; padding: 8px 0; }
+/* 높이는 그려진 악보에 맞춰 늘고(render.ts 가 SVG 를 내용에 맞춤), 너무 크면 300px 에서 막는다 */
+.staff { min-height: 120px; max-height: 300px; flex: none; overflow-x: auto; overflow-y: hidden; position: relative; background: rgba(0,0,0,0.18); -webkit-overflow-scrolling: touch; }
+.staff__svg { padding: 8px 0; }
 .staff svg { display: block; }
 .staff g[id^="vf-n"] { cursor: pointer; }
 .staff g.cur * { fill: var(--amber) !important; stroke: var(--amber) !important; }
