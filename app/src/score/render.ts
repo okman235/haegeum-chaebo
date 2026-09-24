@@ -13,8 +13,7 @@ export interface RenderOptions {
 }
 
 const key = (m: number) => `${NAMES[pitchClass(m)].toLowerCase()}/${octaveOf(m)}`
-// 줄 하나에 주는 세로 공간. 오선 위로 STAVE_TOP, 아래로 나머지 - 해금 음역(D3 덧줄 5개 ~ A5)이 잘리지 않게 넉넉히.
-const HEAD = 96, STAVE_H = 210, STAVE_TOP = 64
+const HEAD = 96, STAVE_H = 130
 
 /** 렌더한 SVG 의 전체 크기를 돌려준다 */
 export function renderScore(el: HTMLDivElement, score: Score, o: RenderOptions): { width: number; height: number } {
@@ -47,7 +46,7 @@ export function renderScore(el: HTMLDivElement, score: Score, o: RenderOptions):
 
   let prevPiece: { sn: StaveNote; tie: boolean } | null = null
   lines.forEach((line, li) => {
-    const y = STAVE_TOP + li * (STAVE_H + lineGap)
+    const y = 22 + li * (STAVE_H + lineGap)
     // 인쇄면 줄 폭을 채우도록 마디를 늘린다
     const natural = line.reduce((a, i) => a + bodyW[i], HEAD)
     const stretch = o.wrapWidth && li < lines.length - 1 ? (o.wrapWidth - 10) / natural : 1
@@ -83,20 +82,5 @@ export function renderScore(el: HTMLDivElement, score: Score, o: RenderOptions):
       x += w
     })
   })
-  // 화면(한 줄)에서는 실제 그려진 범위에 맞춰 세로를 꼭 맞춘다 - 음역이 좁으면 낮게, 넓으면 높게. 가로 축척은 그대로.
-  if (!o.wrapWidth) {
-    const svg = el.querySelector('svg')
-    if (svg && svg.isConnected) {
-      const bb = svg.getBBox()
-      if (bb.height > 0) {
-        const pad = 6
-        const h = Math.ceil(bb.height + pad * 2)
-        svg.setAttribute('viewBox', `0 ${Math.floor(bb.y - pad)} ${width} ${h}`)
-        svg.setAttribute('height', String(h))
-        svg.style.height = `${h}px`
-        return { width, height: h }
-      }
-    }
-  }
   return { width, height }
 }
